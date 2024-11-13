@@ -1,3 +1,5 @@
+[Versão em português](https://github.com/SrTonn/PDF2Image/blob/main/README-ptBr.md)
+
 # PDF2Image
 
 PDF2Image is a command-line application developed in C# that converts PDF pages into PNG images. It uses the **PdfiumViewer** library to render and save each PDF page as a high-quality image.
