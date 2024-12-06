@@ -1,4 +1,6 @@
 ﻿using System.Drawing.Imaging;
+using System.Reflection;
+using System.Web;
 using PdfiumViewer;
 
 namespace PDF2Image;
@@ -7,53 +9,96 @@ class Program
 {
     static void Main(string[] args)
     {
-        if (Console.GetCursorPosition() == (0, 0) && args.Length == 0)
+        if (args.Length < 2)
         {
-            Console.WriteLine("Usage: PDF2Image.exe input output");
-            Console.WriteLine("");
-            Console.WriteLine("Input can be a PDF file or folder path");
-            Console.WriteLine("Output must be a folder path");
-            FinishApplication();
+            ShowHelp();
             return;
         }
         
-        var inputPath = args[0];
-        var outputPath = args[1];
-        
-        if (PathValidator.IsDirectoryPath(inputPath))
+        string inputPath = null;
+        string outputPath = null;
+        var prefix = string.Empty;
+        var clearOutput = false;
+        foreach (var arg in args)
         {
-            var files = Directory.GetFiles(inputPath, "*.pdf");
-            bool pdfExists = files.Length > 0;
+            if (inputPath == null)
+            {
+                inputPath = arg;
+            }
+            else if (outputPath == null)
+            {
+                outputPath = arg;
+            }
+            else if (arg.StartsWith("--prefix="))
+            {
+                prefix = HttpUtility.UrlDecode(arg["--prefix=".Length..]);
+            }
+            else if (arg == "--clear")
+            {
+                clearOutput = true;
+            }
+        }
+        
+        if (string.IsNullOrEmpty(inputPath) || string.IsNullOrEmpty(outputPath))
+        {
+            Console.WriteLine("Error: Both --input and --output parameters are required.");
+            ShowHelp();
+            return;
+        }
+        
+        Console.WriteLine("PDF2Image - version 1.1.0");
+        Console.WriteLine("Starting PDF conversion with the following options:");
+        Console.WriteLine($"Input Path: {inputPath}");
+        Console.WriteLine($"Output Path: {outputPath}");
+        Console.WriteLine($"Prefix: {(prefix ?? "None")}");
+        Console.WriteLine($"Clear Output Folder: {clearOutput}");
+        
+        if (PathValidator.IsDirectoryPath(inputPath!))
+        {
+            var files = Directory.GetFiles(inputPath!, "*.pdf");
+            var pdfExists = files.Length > 0;
             if (!pdfExists)
             {  
                 Console.WriteLine("Folder doesn't contains PDF files.");
                 return;
             }  
-            Console.WriteLine($"Found {files.Length} PDF files.");  
-            
+            Console.WriteLine($"Found {files.Length} PDF files.");
             foreach (var file in files)
-                ConvertPdfToImages(file, outputPath);
+            {
+                var outputFolder = CreateOutputFolderIfNotExists(file, outputPath!, prefix, clearOutput);
+                ConvertPdfToImages(file, outputFolder);
+            }
             
         }
-        else if (PathValidator.IsFilePath(inputPath))
+        else if (PathValidator.IsFilePath(inputPath!))
         {
-            ConvertPdfToImages(inputPath, outputPath);
+            var outputFolder = CreateOutputFolderIfNotExists(inputPath!, outputPath!, prefix, clearOutput);
+            ConvertPdfToImages(inputPath!, outputFolder);
         }
-
-        FinishApplication();
     }
 
-    private static void FinishApplication()
+    private static void ShowHelp()
     {
-        Console.WriteLine("Press enter to close...");
-        Console.ReadLine();
+        Console.WriteLine("PDF2Image Converter - Help");
+        Console.WriteLine("Usage:");
+        Console.WriteLine("  PDF2Image.exe [input] [output] [options]");
+        Console.WriteLine();
+        Console.WriteLine("Arguments:");
+        Console.WriteLine("  --input=<input_path>      Path to the folder containing PDF files or a single PDF file.");
+        Console.WriteLine("  --output=<output_path>    Path to the folder where images will be saved.");
+        Console.WriteLine();
+        Console.WriteLine("Options:");
+        Console.WriteLine("  --prefix=<prefix>         Add a prefix to the output folder (e.g., [new] ).");
+        Console.WriteLine("  --clear                   Clear the output folder before conversion.");
+        Console.WriteLine("  --help                    Show this help message.");
+        Console.WriteLine();
+        Console.WriteLine("Examples:");
+        Console.WriteLine("  PDF2Image.exe \"C:\\PDFs\" \"C:\\Images\" --clear");
+        Console.WriteLine("  PDF2Image.exe \"C:\\PDFs\\file.pdf\" \"C:\\Images\" --prefix=[new]");
     }
-
 
     private static void ConvertPdfToImages(string pdfFilePath, string outputFolder)
     {
-        outputFolder = CreateOutputFolderIfNotExists(pdfFilePath, outputFolder);
-        
         using (var pdfDocument = PdfDocument.Load(pdfFilePath))
         {
             var totalPages = pdfDocument.PageCount;
@@ -72,16 +117,34 @@ class Program
         }
     }
 
-    private static string CreateOutputFolderIfNotExists(string pdfFilePath, string outputFolder)
+    private static string CreateOutputFolderIfNotExists(string pdfFilePath, string outputFolder, string prefix, bool clearOutput = false)
     {
         var fileNameWithoutExtension = Path.GetFileNameWithoutExtension(pdfFilePath);
-        var newOutputFolder = Path.Combine(outputFolder, "[PDF] " + fileNameWithoutExtension);
+        var newOutputFolder = Path.Combine(outputFolder, prefix + fileNameWithoutExtension);
         
-        if (Directory.Exists(newOutputFolder)) return newOutputFolder;
+        if (Directory.Exists(newOutputFolder))
+        {
+            ClearOutputFolder(newOutputFolder);
+            return newOutputFolder;
+        }
         
         Directory.CreateDirectory(newOutputFolder);
         Console.WriteLine($"Output folder \"{new DirectoryInfo(newOutputFolder).Name}\" created with success");
         
         return newOutputFolder;
+    }
+
+    private static void ClearOutputFolder(string outputPath)
+    {
+        Console.WriteLine("Clearing the output folder...");
+        try
+        {
+            Directory.GetFiles(outputPath).ToList().ForEach(File.Delete);
+            Console.WriteLine("Output folder cleared successfully.");
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error clearing the output folder: {ex.Message}");
+        }
     }
 }
