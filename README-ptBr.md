@@ -26,12 +26,11 @@ PDF2Image.exe <entrada> <saída>
 1. Para converter um único arquivo PDF em imagens:
 
 ```bash
-Copy code
 PDF2Image.exe "C:\caminho\para\arquivo.pdf" "C:\caminho\para\saída"
 ```
+
 2. Para converter todos os arquivos PDF em uma pasta:
 ```bash
-Copy code
 PDF2Image.exe "C:\caminho\para\pasta_de_pdfs" "C:\caminho\para\saída"
 ```
 
